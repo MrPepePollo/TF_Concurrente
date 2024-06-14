@@ -4,10 +4,11 @@ import (
 	"encoding/csv"
 	"encoding/gob"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	"net"
-	"os"
+	"net/http"
 	"strconv"
 	"sync"
 )
@@ -26,13 +27,11 @@ func main() {
 
 	log.Println("Starting goroutines...")
 
-	// Create a channel for each goroutine
 	channels := make([]chan []Cluster, len(parts))
 	for i := range channels {
 		channels[i] = make(chan []Cluster)
 	}
 
-	// Start each goroutine
 	var wg sync.WaitGroup
 	for i, part := range parts {
 		wg.Add(1)
@@ -41,7 +40,6 @@ func main() {
 
 			log.Println("Connecting to server...")
 
-			// Connect to the server
 			conn, err := net.Dial("tcp", "localhost:8080")
 			if err != nil {
 				fmt.Println(err)
@@ -51,7 +49,6 @@ func main() {
 
 			log.Println("Sending data to server...")
 
-			// Send the data to the server
 			data := &Data{Part: part}
 			encoder := gob.NewEncoder(conn)
 			encoder.Encode(data)
@@ -84,27 +81,41 @@ func main() {
 
 	log.Println("Printing clusters...")
 
-	// Print the clusters
 	for i, cluster := range totalClusters {
 		log.Printf("Cluster %d: %v\n", i, cluster.Centroid)
 	}
 }
 
 func LoadAndDivideDataset() [][][]string {
-	// Load the dataset
-	file, err := os.Open("SocialNetworkDataset.csv")
+
+	url := "https://raw.githubusercontent.com/MrPepePollo/TF_Concurrente/master/SocialNetworkDataset.csv"
+
+	resp, err := http.Get(url)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer file.Close()
+	defer resp.Body.Close()
 
-	reader := csv.NewReader(file)
-	records, err := reader.ReadAll()
-	if err != nil {
-		log.Fatal(err)
+	if resp.StatusCode != http.StatusOK {
+		log.Fatalf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	// Divide the dataset into parts
+	reader := csv.NewReader(resp.Body)
+
+	var records [][]string
+
+	for {
+		record, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		records = append(records, record)
+	}
+
 	numGoroutines := 10
 	partSize := len(records) / numGoroutines
 	parts := make([][][]string, numGoroutines)
@@ -118,6 +129,7 @@ func LoadAndDivideDataset() [][][]string {
 	}
 
 	return parts
+
 }
 
 func kmeans(part [][]string, k int) []Cluster {
