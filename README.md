@@ -129,6 +129,7 @@ Link del repositorio de GitHub:
 ` `<https://github.com/MrPepePollo/TF_Concurrente> 
 
 Link del video: 
+https://www.youtube.com/watch?v=EcyrJlc9BV8
 
 
 
